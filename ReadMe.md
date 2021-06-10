@@ -5,8 +5,7 @@
 This folder contains various data regarding the B0 distribution from of the MRI-Linac magnet, as well as code to read it. In the wiki of this repository there is some analysis of the various data we have available.
 At the time of writing it is not known how well this correlates with the current state of the magnet!! 
 
-![](\_resources\5thOrder_3D.png)
-
+![3Dfields](_resources/5thOrder_3D.png)
 
 ## Usage
 

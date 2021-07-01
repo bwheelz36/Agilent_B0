@@ -1,8 +1,6 @@
 %%% this is to generate the coordinate of main field
 clear;
-%load('H:\MRI\manuscript\manuscript_stream function\Medical Physics\Review\main_field1.mat');
-%load('main_field1.mat');
-%load('D:\H disk from UQ computer\MRI\manuscript\manuscript_stream function\Medical Physics\Review\main_field15.mat');
+
 load('data_B0_field.mat')
 main_field=mainfeild15(1:12,:);
 %main_field=mainfeild1(1:12,:);

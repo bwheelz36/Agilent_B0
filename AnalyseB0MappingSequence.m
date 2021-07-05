@@ -1,4 +1,22 @@
-function AnalyseB0MappingSequence(varargin)
+function AnalyseB0MappingSequence(varargin)  
+
+    % Brendan Whelan 2021
+    
+    % This code takes the output of the siemens B0 mapping sequence and
+    % attempts to turn it into a B0 map. I am not convinced it works at the
+    % moment. 
+    % the input data are: PhasePath and MagPath, which are the folders
+    % containing the phase and magnitude dicoms.
+    % you can call this function like this
+    % AnalyseB0MappingSequence(MagDataPath, PhaseDataPath);
+    % or like this:
+    % AnalyseB0MappingSequence();
+    % in the latter case it will prompt you for the data location.
+    
+    % This software requires two external libraries:
+    % SPM:         https://www.fil.ion.ucl.ac.uk/spm/software/
+    % dicm2nii:    https://github.com/xiangruili/dicm2nii
+
     %% set up options
     % I use this structure to set global options and keep track of variables that are shared
     % between functions

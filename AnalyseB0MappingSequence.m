@@ -32,7 +32,7 @@ function AnalyseB0MappingSequence(varargin)
     elseif numel(varargin) == 2
            PhasePath = varargin{1};
            MagPath = varargin{2};
-        if ~isfolder(varargin{1}) && ~isfolder(varargin{2})
+        if ~isfolder(varargin{1}) || ~isfolder(varargin{2})
             error('At least one of PhasePath and MagPath is not a directory...')
         end
     end

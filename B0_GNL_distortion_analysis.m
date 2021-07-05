@@ -54,12 +54,14 @@ R = sqrt(x_t.^2 + y_t.^2 + z_t.^2) * 1e3;  % R in mm
 DSV = 100; % ROI
 DSV_ind = R <= DSV;
 DSV_dist_100 = Bz_B0(DSV_ind) * 10^5;
-fprintf('\nMax Distortion in %1.2f mm DSV is %1.2f mm. Mean is %1.2f mm',DSV, max(DSV_dist_100), mean(DSV_dist_100));
+P2P = (max(DSV_dist_100) - min(DSV_dist_100)) * 10;  %note already multipled by 1e5 
+fprintf('\nMax Distortion in %1.2f mm DSV is %1.2f mm. Mean is %1.2f mm. peak-peak is %1.2f uT',DSV, max(DSV_dist_100), mean(DSV_dist_100), P2P);
 
 DSV = 150; % ROI
 DSV_ind = R <= DSV;
 DSV_dist_150 = Bz_B0(DSV_ind) * 10^5;
-fprintf('\nMax Distortion in %1.2f mm DSV is %1.2f mm. Mean is %1.2f mm',DSV, max(DSV_dist_150), mean(DSV_dist_150));
+P2P = (max(DSV_dist_150) - min(DSV_dist_150)) * 10;  %note already multipled by 1e5 
+fprintf('\nMax Distortion in %1.2f mm DSV is %1.2f mm. Mean is %1.2f mm. peak-peak is %1.2f uT',DSV, max(DSV_dist_150), mean(DSV_dist_150),P2P);
 
 hfig2 = figure;
 grp = [zeros(1, numel(DSV_dist_100)),ones(1,numel(DSV_dist_150))];

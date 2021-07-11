@@ -49,6 +49,7 @@ function AnalyseB0MappingSequence(varargin)
     
     %% Load the necessary software libraries:
     LoadLibraries(B0options)
+
     
     %% convert dicoms to nii:
     B0options = ConvertDicomToNii(B0options);
@@ -60,6 +61,9 @@ function AnalyseB0MappingSequence(varargin)
     AnalyseFieldMapData(FieldMapData)
     
 %% Sub functions
+
+
+
     function B0options = ConvertDicomToNii(B0options)
         % empty and cake folders:
         if isfolder(fullfile(B0options.PhasePath,'NIIs'))
@@ -143,6 +147,11 @@ function AnalyseB0MappingSequence(varargin)
         error(ErrorMessage);
     end
     
+    function [X,Y,Z] = ConstructCoordinateSystem()
+        % build a coordinate system bsed on the dicom header
+        print9('hello');
+        
+        
     
     function FieldMapData = GenerateB0Maps(B0options)
         % this is adapted from the the code at
@@ -161,12 +170,16 @@ function AnalyseB0MappingSequence(varargin)
             IP.P{1} = spm_vol(tmp.fname);
         end
         IP.P{2} = spm_vol(fullfile(B0options.MagPath,'NIIs',B0options.MagImage));    % Mag image
-
+        
+        
+        %----------------------------------------------------------------------
+        % Get the two echo times
+        %----------------------------------------------------------------------
+        print('hello')
 %
         %----------------------------------------------------------------------
         % Create field map (in Hz) - this routine calls the unwrapping
         %----------------------------------------------------------------------
-
         IP.fm = FieldMap('CreateFieldMap',IP);
         FieldMapData = IP.fm;  % to return to main
         %----------------------------------------------------------------------

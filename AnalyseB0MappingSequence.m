@@ -1,4 +1,4 @@
-function AnalyseB0MappingSequence(varargin)  
+function B0options = AnalyseB0MappingSequence(varargin)  
 
     % Brendan Whelan 2021
     
@@ -49,21 +49,20 @@ function AnalyseB0MappingSequence(varargin)
     
     %% Load the necessary software libraries:
     LoadLibraries(B0options)
-
     
     %% convert dicoms to nii:
     B0options = ConvertDicomToNii(B0options);
     
+    %% Construct a coordinate system
+    B0options = ConstructCoordinateSystem(B0options);
+    
     %% run NIIs through the SPM B0 mapping toolbox, and save the data
-    FieldMapData = GenerateB0Maps(B0options);
+    B0options = GenerateB0Maps(B0options);
     
     %% Analyse the FieldMapData
-    AnalyseFieldMapData(FieldMapData)
+    AnalyseFieldMapData(B0options);
     
 %% Sub functions
-
-
-
     function B0options = ConvertDicomToNii(B0options)
         % empty and cake folders:
         if isfolder(fullfile(B0options.PhasePath,'NIIs'))
@@ -147,13 +146,27 @@ function AnalyseB0MappingSequence(varargin)
         error(ErrorMessage);
     end
     
-    function [X,Y,Z] = ConstructCoordinateSystem()
-        % build a coordinate system bsed on the dicom header
-        print9('hello');
-        
-        
     
-    function FieldMapData = GenerateB0Maps(B0options)
+    function B0options = ConstructCoordinateSystem(B0options)
+        % build a coordinate system bsed on the dicom header
+        warning('this part of the code is quite dodgy and not generalised for all input dicoms');
+        HeaderInfo = load( fullfile(B0options.PhasePath,'NIIs\dcmHeaders.mat'));
+        HeaderInfo = HeaderInfo.h.gre_field_mapping_pos4_xy_e1;
+        StartPos = HeaderInfo.ImagePositionPatient;
+        HeaderInfo.SpacingBetweenSlices;
+        HeaderInfo.SliceThickness;
+        PixelSpacing =HeaderInfo.PixelSpacing;
+        Rows = HeaderInfo.Rows;
+        Columns = HeaderInfo.Columns;
+        Nslices = HeaderInfo.LocationsInAcquisition;
+        SliceThickness = HeaderInfo.SliceThickness;
+        
+        B0options.x = linspace(StartPos(1), SliceThickness * double(Nslices), Nslices);
+        B0options.y = linspace(StartPos(2), PixelSpacing(1) * double(Rows), Rows);
+        B0options.z = linspace(StartPos(3), PixelSpacing(2) * double(Columns), Columns);
+
+            
+    function B0options = GenerateB0Maps(B0options)
         % this is adapted from the the code at
         % {SPMroot}\toolbox\FieldMap\FieldMap_ngui.m
         spm('defaults','FMRI');
@@ -173,10 +186,12 @@ function AnalyseB0MappingSequence(varargin)
         
         
         %----------------------------------------------------------------------
-        % Get the two echo times
+        % Get the two echo times and set the IP structure
         %----------------------------------------------------------------------
-        print('hello')
-%
+        HeaderInfo = load( fullfile(B0options.PhasePath,'NIIs\dcmHeaders.mat'));
+        IP.et{1} = HeaderInfo.h.gre_field_mapping_pos4_xy_e1.EchoTime;
+        IP.et{2} = HeaderInfo.h.gre_field_mapping_pos4_xy_e2.EchoTime;
+
         %----------------------------------------------------------------------
         % Create field map (in Hz) - this routine calls the unwrapping
         %----------------------------------------------------------------------
@@ -189,19 +204,20 @@ function AnalyseB0MappingSequence(varargin)
         % where we want
         FieldMap('write',IP.P{1},IP.fm.fpm,'fpm_',64,'Smoothed phase map');
         fprintf('field map data written to %s',B0options.FieldMapWritePath);
+        B0options.FieldMapData = FieldMapData;
     
         
-    function AnalyseFieldMapData(FieldMapData)
+    function B0options = AnalyseFieldMapData(B0options)
         % see the SPM documentation for FieldMap for explanation of
         % different fields
         
         gyroMagRatio=2.675e8;
-        fprintf('\nPeak-Peak in Hz is %1.2f (unregularised)',max(FieldMapData.upm(:)) - min(FieldMapData.upm(:)))
-        fprintf('\nPeak-Peak in Hz is %1.2f (regularised)',max(FieldMapData.fpm(:)) - min(FieldMapData.fpm(:)))
+        fprintf('\nPeak-Peak in Hz is %1.2f (unregularised)',max(B0options.FieldMapData.upm(:)) - min(B0options.FieldMapData.upm(:)))
+        fprintf('\nPeak-Peak in Hz is %1.2f (regularised)',max(B0options.FieldMapData.fpm(:)) - min(B0options.FieldMapData.fpm(:)))
         fprintf('\n\nThis corresponds to:')
-        PPM = (FieldMapData.upm./gyroMagRatio) * 1e6;
+        PPM = (B0options.FieldMapData.upm./gyroMagRatio) * 1e6;
         fprintf('\nPeak-Peak in uT is %1.2f (unregularised)',max(PPM(:)) - min(PPM(:)))
-        PPM = (FieldMapData.fpm./gyroMagRatio) * 1e6;
+        PPM = (B0options.FieldMapData.fpm./gyroMagRatio) * 1e6;
         fprintf('\nPeak-Peak in uT is %1.2f (regularised)',max(PPM(:)) - min(PPM(:)))
         
         

@@ -4,7 +4,7 @@
 close all % close open figures
 clc % clear the terminal screen
 clear SHoptions % make sure only what's written down is used.
-PathToSphericalHarmonicsCode = 'C:\Users\Brendan\Dropbox (Sydney Uni)\abstracts,presentations etc\MATLAB\AMRsoftwareSuite\amr-repository\SphericalHarmonics\source';
+PathToSphericalHarmonicsCode = 'C:\Users\Brendan\Documents\MATLAB\SphericalHarmonics\source';
 addpath(PathToSphericalHarmonicsCode);
 
 %% enter data
@@ -17,7 +17,7 @@ SHoptions=struct; %initiate empty variable (minimum requirement to call code)
 SHoptions.CalculateVRMS=0;
 SHoptions.QuantifyFit=1;
 SHoptions.PlotToggle = 1;
-SHoptions.maxOrder = 7;
+SHoptions.maxOrder = 8;
 
 
 %% call code

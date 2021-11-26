@@ -29,9 +29,11 @@ function B0options = AnalyseB0MappingSequence(varargin)
     if numel(varargin) == 0
        PhasePath = uigetdir('Please select the directory containing the phase images');
        MagPath = uigetdir('Please select the directory containing the phase images');
+       % e.g: AnalyseB0MappingSequence('D:\MRI-Linac\B0 field map data\GRE_FIELD_MAPPING_POS4_XY_0005','D:\MRI-Linac\B0 field map data\\GRE_FIELD_MAPPING_POS4_XY_0006')
+
     elseif numel(varargin) == 2
-           PhasePath = varargin{1};
-           MagPath = varargin{2};
+           MagPath = varargin{1};
+           PhasePath = varargin{2};
         if ~isfolder(varargin{1}) || ~isfolder(varargin{2})
             error('At least one of PhasePath and MagPath is not a directory...')
         end
@@ -61,6 +63,9 @@ function B0options = AnalyseB0MappingSequence(varargin)
     
     %% Analyse the FieldMapData
     AnalyseFieldMapData(B0options);
+    
+    %% Export data to table format for spherical harmonic analysis
+    ExportTableData(B0options);
     
 %% Sub functions
     function B0options = ConvertDicomToNii(B0options)
@@ -149,29 +154,63 @@ function B0options = AnalyseB0MappingSequence(varargin)
     
     function B0options = ConstructCoordinateSystem(B0options)
         % build a coordinate system bsed on the dicom header
-        warning('this part of the code is quite dodgy and not generalised for all input dicoms');
-        HeaderInfo = load( fullfile(B0options.PhasePath,'NIIs\dcmHeaders.mat'));
+        warning('this part of the code has not been well tested');
+        HeaderInfo = load( fullfile(B0options.MagPath,'NIIs\dcmHeaders.mat'));
         HeaderInfo = HeaderInfo.h.gre_field_mapping_pos4_xy_e1;
-        StartPos = HeaderInfo.ImagePositionPatient;
-        HeaderInfo.SpacingBetweenSlices;
-        HeaderInfo.SliceThickness;
-        PixelSpacing =HeaderInfo.PixelSpacing;
-        Rows = HeaderInfo.Rows;
-        Columns = HeaderInfo.Columns;
-        Nslices = HeaderInfo.LocationsInAcquisition;
-        SliceThickness = HeaderInfo.SliceThickness;
-        
-        B0options.x = linspace(StartPos(1), SliceThickness * double(Nslices), Nslices);
-        B0options.y = linspace(StartPos(2), PixelSpacing(1) * double(Rows), Rows);
-        B0options.z = linspace(StartPos(3), PixelSpacing(2) * double(Columns), Columns);
 
+        CoordinateMatrix = zeros(4, 4);
+        CoordinateMatrix(1:3,1)=HeaderInfo.ImageOrientationPatient(1:3) * HeaderInfo.PixelSpacing(1);
+        CoordinateMatrix(1:3,2)=HeaderInfo.ImageOrientationPatient(4:6) * HeaderInfo.PixelSpacing(2);
+        CoordinateMatrix(1:3,4) = HeaderInfo.ImagePositionPatient;
+        CoordinateMatrix(4,4) = 1;
+% 
+        ijMatrix = zeros([4, HeaderInfo.Rows * HeaderInfo.Columns]);
+        i_indices = linspace(0, double(HeaderInfo.Rows - 1), double(HeaderInfo.Rows));
+        j_indices = linspace(0, double(HeaderInfo.Columns - 1), double(HeaderInfo.Columns));
+        [ii, jj] = meshgrid(i_indices, j_indices);
+        ijMatrix(1,:) = ii(:);
+        ijMatrix(2,:) = jj(:);
+        ijMatrix(4,:) = 1;
+        
+        XYZtemp = CoordinateMatrix *  ijMatrix;
+        B0options.x = unique(XYZtemp(1,:));
+        B0options.y = unique(XYZtemp(2,:));
+        B0options.z = unique(XYZtemp(2,:));
+        
+        % one of these entries will be single valued, replace this with the slice
+        % locations: (not sure how robust this is)
+        if numel(B0options.x) ==1
+            % this seems to be a tiny bit off compared to the recorded
+            % slice positions, it might be safer to loop over all the
+            % slices...
+            B0options.x = linspace(double(HeaderInfo.ImagePositionPatient(1)),...
+                double(HeaderInfo.ImagePositionPatient(1) + ...
+                (HeaderInfo.SliceThickness*(HeaderInfo.LocationsInAcquisition-1))),...
+                HeaderInfo.LocationsInAcquisition);
+        elseif numel(B0options.y) == 1
+            warning('this orientation not coded yet')
+        elseif numel(B0options.z) ==1
+            warning('this orientation not coded yet')
+        else
+            warning('this is weird')
+        end
+        
+        % switcheroo to account for our weird coordinate system (heuristic)
+        temp_z = B0options.z;
+        temp_x = B0options.x;
+        temp_y = B0options.y;
+        B0options.z = temp_z;
+        B0options.x = temp_x;
+        B0options.y = temp_y;
+        
             
     function B0options = GenerateB0Maps(B0options)
         % this is adapted from the the code at
         % {SPMroot}\toolbox\FieldMap\FieldMap_ngui.m
         spm('defaults','FMRI');
         IP = FieldMap('Initialise'); % Gets default params from pm_defaults
-
+        
+        IP.maskbrain = false; % turn off automatic masking
         %----------------------------------------------------------------------
         % Load measured field map data - phase and magnitude or real and imaginary
         %----------------------------------------------------------------------
@@ -183,14 +222,6 @@ function B0options = AnalyseB0MappingSequence(varargin)
             IP.P{1} = spm_vol(tmp.fname);
         end
         IP.P{2} = spm_vol(fullfile(B0options.MagPath,'NIIs',B0options.MagImage));    % Mag image
-        
-        
-        %----------------------------------------------------------------------
-        % Get the two echo times and set the IP structure
-        %----------------------------------------------------------------------
-        HeaderInfo = load( fullfile(B0options.PhasePath,'NIIs\dcmHeaders.mat'));
-        IP.et{1} = HeaderInfo.h.gre_field_mapping_pos4_xy_e1.EchoTime;
-        IP.et{2} = HeaderInfo.h.gre_field_mapping_pos4_xy_e2.EchoTime;
 
         %----------------------------------------------------------------------
         % Create field map (in Hz) - this routine calls the unwrapping
@@ -215,9 +246,23 @@ function B0options = AnalyseB0MappingSequence(varargin)
         fprintf('\nPeak-Peak in Hz is %1.2f (unregularised)',max(B0options.FieldMapData.upm(:)) - min(B0options.FieldMapData.upm(:)))
         fprintf('\nPeak-Peak in Hz is %1.2f (regularised)',max(B0options.FieldMapData.fpm(:)) - min(B0options.FieldMapData.fpm(:)))
         fprintf('\n\nThis corresponds to:')
-        PPM = (B0options.FieldMapData.upm./gyroMagRatio) * 1e6;
+        PPM = (B0options.FieldMapData.upm./gyroMagRatio) * 1e6 * 2 * pi;
         fprintf('\nPeak-Peak in uT is %1.2f (unregularised)',max(PPM(:)) - min(PPM(:)))
-        PPM = (B0options.FieldMapData.fpm./gyroMagRatio) * 1e6;
-        fprintf('\nPeak-Peak in uT is %1.2f (regularised)',max(PPM(:)) - min(PPM(:)))
+        PPM = (B0options.FieldMapData.fpm./gyroMagRatio) * 1e6 * 2 * pi;
+        fprintf('\nPeak-Peak in uT is %1.2f (regularised)\n',max(PPM(:)) - min(PPM(:)))
+        
+    
+    function ExportTableData(B0options)
+
+        HeaderString = [append(string(numel(B0options.x)),' ', string(numel(B0options.y)),' ',string(numel(B0options.z))) ' 1 X [MM]' ' 2 Y [MM]' ' 3 Z [MM]' ' 4 BZ [TESLA]' ' 0'];
+
+        gyroMagRatio=2.675e8;
+        fid = fopen(fullfile(B0options.FieldMapWritePath,'B0map.table'),'w');
+        [XX,YY,ZZ] = meshgrid(B0options.x, B0options.y, B0options.z);
+        mask =  B0options.FieldMapData.mask(:) > 0;
+        Data = [XX(mask), YY(mask), ZZ(mask), (B0options.FieldMapData.fpm(mask)/gyroMagRatio) * 2 * pi];
+        fprintf(fid,'%s\n',HeaderString);
+        fprintf(fid,'%1.10f       %1.10f       %1.10f       %1.10f\n',Data');
+        fclose('all');
         
         
